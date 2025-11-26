@@ -1,0 +1,76 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="page">
+    <!-- Chỉ hiện Sidebar khi biến ShowSidebar = true -->
+    @if (ShowSidebar)
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    }
+
+    <main>
+        <!-- Chỉ hiện link Profile khi có Sidebar (tránh hiện lơ lửng ở trang Home của khách) -->
+        @if (ShowSidebar)
+        {
+            <div class="nav-item">
+                <NavLink href="profile"></NavLink>
+            </div>
+        }
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private bool isAuthenticated = false;
+    private string currentUrl = "";
+
+    // Logic: Hiện Sidebar khi (Đã đăng nhập) HOẶC (Đang không ở trang chủ)
+    // Ẩn khi: (Chưa đăng nhập) VÀ (Đang ở trang chủ - currentUrl rỗng)
+    private bool ShowSidebar => isAuthenticated || !string.IsNullOrEmpty(currentUrl);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 1. Lấy URL hiện tại
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+
+        // 2. Đăng ký sự kiện để theo dõi khi người dùng chuyển trang
+        NavigationManager.LocationChanged += OnLocationChanged;
+
+        // 3. Kiểm tra trạng thái đăng nhập
+        await CheckAuthStatus();
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        await CheckAuthStatus();
+        StateHasChanged();
+    }
+
+    private async Task CheckAuthStatus()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+    }
+
+    public void Dispose()
+    {
+        // Hủy đăng ký sự kiện để tránh rò rỉ bộ nhớ
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}
